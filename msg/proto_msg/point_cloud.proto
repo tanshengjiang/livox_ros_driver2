@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package SensorMsg;
+
+import "header.proto";
+
+message PointXYZIT {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+  uint32 intensity = 4;
+  uint64 timestamp = 5;
+}
+
+message PointCloudXYZIT {
+  CommonMsg.Header header = 1;
+  int32 width  = 2;
+  int32 height = 3;
+  // true:不包含无效点（nan点）
+  bool is_dense = 4;
+  repeated PointXYZIT points = 5;
+} 

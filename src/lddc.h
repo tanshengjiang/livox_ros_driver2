@@ -36,14 +36,16 @@ namespace livox_ros {
 typedef enum {
   kOutputToRos = 0,
   kOutputToRosBagFile = 1,
+  kOutputToEcal = 2,
 } DestinationOfMessageOutput;
 
 /** The message type of transfer */
 typedef enum {
   kPointCloud2Msg = 0,
   kLivoxCustomMsg = 1,
-  kPclPxyziMsg = 2,
-  kLivoxImuMsg = 3,
+  KPointEcal2Msg = 2,
+  kPclPxyziMsg = 3,
+  kLivoxImuMsg = 4,
 } TransferType;
 
 /** Type-Definitions based on ROS versions */
@@ -63,9 +65,15 @@ using PointField = sensor_msgs::msg::PointField;
 using CustomMsg = livox_ros_driver2::msg::CustomMsg;
 using CustomPoint = livox_ros_driver2::msg::CustomPoint;
 using ImuMsg = sensor_msgs::msg::Imu;
+#elif defined BUILDING_ECAL
+using Publisher = eCAL::protobuf::CPublisher<SensorMsg::PointCloudXYZIT>;
+using PublisherPtr = std::shared_ptr<eCAL::protobuf::CPublisher<SensorMsg::PointCloudXYZIT>>;
+using PointCloudEcal = SensorMsg::PointCloudXYZIT;
 #endif
 
+#if (BUILDING_ROS2 || BUILDING_ROS1)
 using PointCloud = pcl::PointCloud<pcl::PointXYZI>;
+#endif
 
 class DriverNode;
 
@@ -75,6 +83,9 @@ class Lddc final {
   Lddc(int format, int multi_topic, int data_src, int output_type, double frq,
       std::string &frame_id, bool lidar_bag, bool imu_bag);
 #elif defined BUILDING_ROS2
+  Lddc(int format, int multi_topic, int data_src, int output_type, double frq,
+      std::string &frame_id);
+#elif defined BUILDING_ECAL
   Lddc(int format, int multi_topic, int data_src, int output_type, double frq,
       std::string &frame_id);
 #endif
@@ -97,19 +108,34 @@ class Lddc final {
   Lds *lds_;
 
  private:
+
   void PollingLidarPointCloudData(uint8_t index, LidarDevice *lidar);
+#if(BUILDING_ROS2 || BUILDING_ROS1)
   void PollingLidarImuData(uint8_t index, LidarDevice *lidar);
 
   void PublishPointcloud2(LidarDataQueue *queue, uint8_t index);
+#endif
+
+#ifdef BUILDING_ECAL
+  void PublishPointcloudEcal(LidarDataQueue *queue, uint8_t index);
+#endif
+
+#if(BUILDING_ROS2 || BUILDING_ROS1)
   void PublishCustomPointcloud(LidarDataQueue *queue, uint8_t index);
   void PublishPclMsg(LidarDataQueue *queue, uint8_t index);
-
   void PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index);
 
   void InitPointcloud2MsgHeader(PointCloud2& cloud);
   void InitPointcloud2Msg(const StoragePacket& pkg, PointCloud2& cloud, uint64_t& timestamp);
   void PublishPointcloud2Data(const uint8_t index, uint64_t timestamp, const PointCloud2& cloud);
+#endif
 
+#ifdef BUILDING_ECAL
+  void InitPointcloudEcal2Msg(const StoragePacket& pkg, PointCloudEcal& cloud, uint64_t& timestamp);
+  void PublishPointcloudEcal2Data(const uint8_t index, uint64_t timestamp, const PointCloudEcal& cloud);
+#endif
+  
+#if(BUILDING_ROS2 || BUILDING_ROS1)
   void InitCustomMsg(CustomMsg& livox_msg, const StoragePacket& pkg, uint8_t index);
   void FillPointsToCustomMsg(CustomMsg& livox_msg, const StoragePacket& pkg);
   void PublishCustomPointData(const CustomMsg& livox_msg, const uint8_t index);
@@ -123,13 +149,18 @@ class Lddc final {
   void FillPointsToPclMsg(PointCloud& pcl_msg, LivoxPointXyzrtl* src_point, uint32_t num);
   void FillPointsToCustomMsg(CustomMsg& livox_msg, LivoxPointXyzrtl* src_point, uint32_t num,
       uint32_t offset_time, uint32_t point_interval, uint32_t echo_num);
+#endif
 
 #ifdef BUILDING_ROS2
   PublisherPtr CreatePublisher(uint8_t msg_type, std::string &topic_name, uint32_t queue_size);
 #endif
-
+#ifdef BUILDING_ROS1
   PublisherPtr GetCurrentPublisher(uint8_t index);
   PublisherPtr GetCurrentImuPublisher(uint8_t index);
+#endif
+#ifdef BUILDING_ECAL
+  PublisherPtr GetCurrentPublisher(uint8_t index);
+#endif
 
  private:
   uint8_t transfer_format_;
@@ -153,6 +184,9 @@ class Lddc final {
   PublisherPtr global_pub_;
   PublisherPtr private_imu_pub_[kMaxSourceLidar];
   PublisherPtr global_imu_pub_;
+#elif defined BUILDING_ECAL
+  PublisherPtr private_pub_[kMaxSourceLidar];
+  PublisherPtr global_pub_;
 #endif
 
   livox_ros::DriverNode *cur_node_;

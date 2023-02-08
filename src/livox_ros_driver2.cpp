@@ -23,10 +23,6 @@
 //
 
 #include <iostream>
-#include <chrono>
-#include <vector>
-#include <csignal>
-#include <thread>
 
 #include "include/livox_ros_driver2.h"
 #include "include/ros_headers.h"
@@ -110,6 +106,42 @@ int main(int argc, char **argv) {
   livox_node.imudata_poll_thread_ = std::make_shared<std::thread>(&DriverNode::ImuDataPollThread, &livox_node);
   while (ros::ok()) {}
 
+  return 0;
+}
+
+#elif defined BUILDING_ECAL
+int main(int argc, char **argv) {
+  eCAL::Initialize(argc, argv, "livox_node");
+  eCAL::Util::EnableLoopback(true);
+  // ecal livox_node;
+  livox_ros::DriverNode livox_node;
+
+  /** Init default system parameter */
+  int xfer_format = KPointEcal2Msg;
+  int multi_topic = 0;
+  int data_src = kSourceRawLidar;
+  double publish_freq  = 10.0; /* Hz */
+  int output_type      = kOutputToEcal;
+  std::string frame_id = "livox_frame";
+
+  livox_node.future_ = livox_node.exit_signal_.get_future();
+   /** Lidar data distribute control and lidar data source set */
+  livox_node.lddc_ptr_ = std::make_unique<Lddc>(xfer_format, multi_topic, data_src, output_type,
+                        publish_freq, frame_id);
+  livox_node.lddc_ptr_->SetRosNode(&livox_node);
+  if (data_src == kSourceRawLidar) {
+    std::string user_config_path = "../config/HAP_config.json";
+    LdsLidar *read_lidar = LdsLidar::GetInstance(publish_freq);
+    livox_node.lddc_ptr_->RegisterLds(static_cast<Lds *>(read_lidar));
+
+    if ((read_lidar->InitLdsLidar(user_config_path))) {
+      LIVOX_DEBUG << "Init lds lidar successfully!" << LIVOX_REND;
+    } else {
+      LIVOX_DEBUG << "Init lds lidar failed!" << LIVOX_REND;
+    }
+  }
+  livox_node.pointclouddata_poll_thread_ = std::make_shared<std::thread>(&DriverNode::PointCloudDataPollThread, &livox_node);
+  while (eCAL::Ok()) {} 
   return 0;
 }
 
@@ -203,7 +235,7 @@ void DriverNode::PointCloudDataPollThread()
     status = future_.wait_for(std::chrono::seconds(0));
   } while (status == std::future_status::timeout);
 }
-
+#if(BUILDING_ROS2 || BUILDING_ROS1)
 void DriverNode::ImuDataPollThread()
 {
   std::future_status status;
@@ -213,7 +245,7 @@ void DriverNode::ImuDataPollThread()
     status = future_.wait_for(std::chrono::seconds(0));
   } while (status == std::future_status::timeout);
 }
-
+#endif
 
 
 

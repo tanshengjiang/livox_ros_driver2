@@ -71,6 +71,20 @@ Lddc::Lddc(int format, int multi_topic, int data_src, int output_type,
       frame_id_(frame_id) {
   publish_period_ns_ = kNsPerSecond / publish_frq_;
   lds_ = nullptr;
+#elif defined BUILDING_ECAL
+Lddc::Lddc(int format, int multi_topic, int data_src, int output_type,
+           double frq, std::string &frame_id)
+    : transfer_format_(format),
+      use_multi_topic_(multi_topic),
+      data_src_(data_src),
+      output_type_(output_type),
+      publish_frq_(frq),
+      frame_id_(frame_id) {
+  publish_period_ns_ = kNsPerSecond / publish_frq_;
+  lds_ = nullptr;
+  memset(private_pub_, 0, sizeof(private_pub_));
+  global_pub_ = nullptr;
+  cur_node_ = nullptr;
 #if 0
   bag_ = nullptr;
 #endif
@@ -120,7 +134,6 @@ void Lddc::DistributePointCloudData(void) {
     std::cout << "lds is not registered" << std::endl;
     return;
   }
-  
   while (!lds_->IsRequestExit()) {
     lds_->semaphore_.Wait();
     for (uint32_t i = 0; i < lds_->lidar_count_; i++) {
@@ -135,6 +148,7 @@ void Lddc::DistributePointCloudData(void) {
   }  
 }
 
+#if(BUILDING_ROS2 || BUILDING_ROS1)
 void Lddc::DistributeImuData(void) {
   if (!lds_) {
     std::cout << "lds is not registered" << std::endl;
@@ -149,14 +163,15 @@ void Lddc::DistributeImuData(void) {
     }
   }
 }
+#endif
 
 void Lddc::PollingLidarPointCloudData(uint8_t index, LidarDevice *lidar) {
   LidarDataQueue *p_queue = &lidar->data;
   if (p_queue == nullptr || p_queue->storage_packet == nullptr) {
     return;
   }
-
   while (!lds_->IsRequestExit() && !QueueIsEmpty(p_queue)) {
+#if(BUILDING_ROS2 || BUILDING_ROS1)
     if (kPointCloud2Msg == transfer_format_) {
       PublishPointcloud2(p_queue, index);
     } else if (kLivoxCustomMsg == transfer_format_) {
@@ -164,16 +179,24 @@ void Lddc::PollingLidarPointCloudData(uint8_t index, LidarDevice *lidar) {
     } else if (kPclPxyziMsg == transfer_format_) {
       PublishPclMsg(p_queue, index);
     }
+#endif
+
+#ifdef BUILDING_ECAL
+    if (KPointEcal2Msg == transfer_format_) {
+      PublishPointcloudEcal(p_queue, index);
+    }
+#endif
   }
 }
 
+#if(BUILDING_ROS2 || BUILDING_ROS1)
 void Lddc::PollingLidarImuData(uint8_t index, LidarDevice *lidar) {
   LidarImuDataQueue& p_queue = lidar->imu_data;
   while (!lds_->IsRequestExit() && !p_queue.Empty()) {
     PublishImuData(p_queue, index);
   }
 }
-
+#endif
 void Lddc::PrepareExit(void) {
 #ifdef BUILDING_ROS1
   if (bag_) {
@@ -188,7 +211,7 @@ void Lddc::PrepareExit(void) {
     lds_ = nullptr;
   }
 }
-
+#if(BUILDING_ROS2 || BUILDING_ROS1)
 void Lddc::PublishPointcloud2(LidarDataQueue *queue, uint8_t index) {
   while(!QueueIsEmpty(queue)) {
     StoragePacket pkg;
@@ -197,14 +220,32 @@ void Lddc::PublishPointcloud2(LidarDataQueue *queue, uint8_t index) {
       printf("Publish point cloud2 failed, the pkg points is empty.\n");
       continue;
     }
-
     PointCloud2 cloud;
     uint64_t timestamp = 0;
     InitPointcloud2Msg(pkg, cloud, timestamp);
     PublishPointcloud2Data(index, timestamp, cloud);
   }
 }
+#endif
 
+#ifdef BUILDING_ECAL
+void Lddc::PublishPointcloudEcal(LidarDataQueue *queue, uint8_t index) {
+  while(!QueueIsEmpty(queue)) {
+    StoragePacket pkg;
+    QueuePop(queue, &pkg);
+    if (pkg.points.empty()) {
+      printf("Publish point cloud2 failed, the pkg points is empty.\n");
+      continue;
+    }
+    PointCloudEcal cloud_ecal;
+    uint64_t timestamp = 0;
+    InitPointcloudEcal2Msg(pkg, cloud_ecal, timestamp);
+    PublishPointcloudEcal2Data(index, timestamp, cloud_ecal);
+  }
+}
+#endif
+
+#if(BUILDING_ROS2 || BUILDING_ROS1)
 void Lddc::PublishCustomPointcloud(LidarDataQueue *queue, uint8_t index) {
   while(!QueueIsEmpty(queue)) {
     StoragePacket pkg;
@@ -213,7 +254,6 @@ void Lddc::PublishCustomPointcloud(LidarDataQueue *queue, uint8_t index) {
       printf("Publish custom point cloud failed, the pkg points is empty.\n");
       continue;
     }
-
     CustomMsg livox_msg;
     InitCustomMsg(livox_msg, pkg, index);
     FillPointsToCustomMsg(livox_msg, pkg);
@@ -318,7 +358,32 @@ void Lddc::InitPointcloud2Msg(const StoragePacket& pkg, PointCloud2& cloud, uint
   cloud.data.resize(pkg.points_num * sizeof(LivoxPointXyzrtl));
   memcpy(cloud.data.data(), points.data(), pkg.points_num * sizeof(LivoxPointXyzrtl));
 }
+#endif
 
+#ifdef BUILDING_ECAL
+void Lddc::InitPointcloudEcal2Msg(const StoragePacket& pkg, PointCloudEcal& cloud, uint64_t& timestamp) {
+  cloud.set_width(pkg.points_num);
+  cloud.set_height(1);
+  cloud.set_is_dense(false);
+
+  // if (!pkg.points.empty()) {
+  //   timestamp = pkg.base_time + pkg.points[0].offset_time;
+  // }
+
+  // cloud.mutable_header(timestamp);
+
+  for (size_t i = 0; i < pkg.points_num; ++i) {
+    SensorMsg::PointXYZIT* point_msg = cloud.add_points();
+    point_msg->set_x(pkg.points[i].x);
+    point_msg->set_y(pkg.points[i].y);
+    point_msg->set_z(pkg.points[i].z);
+    point_msg->set_intensity(pkg.points[i].intensity);
+    // point_msg->set_timestamp(timestamp);
+  }
+}
+#endif
+
+#if(BUILDING_ROS2 || BUILDING_ROS1)
 void Lddc::PublishPointcloud2Data(const uint8_t index, const uint64_t timestamp, const PointCloud2& cloud) {
 #ifdef BUILDING_ROS1
   PublisherPtr publisher_ptr = Lddc::GetCurrentPublisher(index);
@@ -337,7 +402,23 @@ void Lddc::PublishPointcloud2Data(const uint8_t index, const uint64_t timestamp,
 #endif
   }
 }
+#endif
 
+#ifdef BUILDING_ECAL
+void Lddc::PublishPointcloudEcal2Data(const uint8_t index, uint64_t timestamp, const PointCloudEcal& cloud) {
+#ifdef BUILDING_ECAL
+  PublisherPtr publisher_ptr = Lddc::GetCurrentPublisher(index);
+#endif
+
+  if (kOutputToEcal == output_type_) {
+    publisher_ptr->Send(cloud);
+    // cloud.PrintDebugString();
+  } 
+
+}
+#endif
+
+#if(BUILDING_ROS2 || BUILDING_ROS1)
 void Lddc::InitCustomMsg(CustomMsg& livox_msg, const StoragePacket& pkg, uint8_t index) {
   livox_msg.header.frame_id.assign(frame_id_);
 
@@ -509,10 +590,13 @@ void Lddc::PublishImuData(LidarImuDataQueue& imu_data_queue, const uint8_t index
 #endif
   }
 }
+#endif
 
 #ifdef BUILDING_ROS2
 std::shared_ptr<rclcpp::PublisherBase> Lddc::CreatePublisher(uint8_t msg_type,
     std::string &topic_name, uint32_t queue_size) {
+
+
     if (kPointCloud2Msg == msg_type) {
       DRIVER_INFO(*cur_node_,
           "%s publish use PointCloud2 format", topic_name.c_str());
@@ -674,6 +758,62 @@ std::shared_ptr<rclcpp::PublisherBase> Lddc::GetCurrentImuPublisher(uint8_t hand
     }
     return global_imu_pub_;
   }
+}
+
+#elif defined BUILDING_ECAL
+PublisherPtr Lddc::GetCurrentPublisher(uint8_t index) {
+ std::shared_ptr<eCAL::protobuf::CPublisher<SensorMsg::PointCloudXYZIT>> pub;
+  uint32_t queue_size = kMinEthPacketQueueSize;
+
+  if (use_multi_topic_) {
+    pub = private_pub_[index];
+    queue_size = queue_size / 8; // queue size is 4 for only one lidar
+  } else {
+    pub = global_pub_;
+    queue_size = queue_size * 8; // shared queue size is 256, for all lidars
+  }
+
+  if (pub == nullptr) {
+    char name_str[48];
+    memset(name_str, 0, sizeof(name_str));
+    if (use_multi_topic_) {
+      std::string ip_string = IpNumToString(lds_->lidars_[index].handle);
+      snprintf(name_str, sizeof(name_str), "livox/lidar_%s",
+               ReplacePeriodByUnderline(ip_string).c_str());
+      // DRIVER_INFO(*cur_node_, "Support multi topics.");
+    } else {
+      // DRIVER_INFO(*cur_node_, "Support only one topic.");
+      snprintf(name_str, sizeof(name_str), "livox/lidar");
+    }
+
+    // *pub = new ros::Publisher;
+#if(BUILDING_ROS2 || BUILDING_ROS1)
+    if (kPointCloud2Msg == transfer_format_) {
+      **pub =
+          cur_node_->GetNode().advertise<sensor_msgs::PointCloud2>(name_str, queue_size);
+      DRIVER_INFO(*cur_node_,
+          "%s publish use PointCloud2 format, set ROS publisher queue size %d",
+          name_str, queue_size);
+    } else if (kLivoxCustomMsg == transfer_format_) {
+      **pub = cur_node_->GetNode().advertise<livox_ros_driver2::CustomMsg>(name_str,
+                                                                queue_size);
+      DRIVER_INFO(*cur_node_,
+          "%s publish use livox custom format, set ROS publisher queue size %d",
+          name_str, queue_size);
+    } else if (kPclPxyziMsg == transfer_format_) {
+      **pub = cur_node_->GetNode().advertise<PointCloud>(name_str, queue_size);
+      DRIVER_INFO(*cur_node_,
+          "%s publish use pcl PointXYZI format, set ROS publisher queue "
+          "size %d",
+          name_str, queue_size);
+    }
+#endif
+    if (KPointEcal2Msg == transfer_format_) {
+      global_pub_ = std::make_shared<eCAL::protobuf::CPublisher<SensorMsg::PointCloudXYZIT>>(name_str);
+      pub = global_pub_;
+    }
+  }
+  return pub;
 }
 #endif
 

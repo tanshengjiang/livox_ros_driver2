@@ -35,7 +35,10 @@ DriverNode::~DriverNode() {
   lddc_ptr_->lds_->RequestExit();
   exit_signal_.set_value();
   pointclouddata_poll_thread_->join();
+
+#if(BUILDING_ROS2 || BUILDING_ROS1)
   imudata_poll_thread_->join();
+#endif
 }
 
 } // namespace livox_ros

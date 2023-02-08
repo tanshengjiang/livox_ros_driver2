@@ -29,6 +29,11 @@
 #include "ros1_headers.h"
 #elif defined BUILDING_ROS2
 #include "ros2_headers.h"
+#elif defined BUILDING_ECAL
+#include <ecal/ecal.h>
+#include <ecal/msg/protobuf/publisher.h>
+#include "ecal_headers.h"
+#include "../msg/proto_msg/point_cloud.pb.h"
 #endif
 
 #endif // ROS_HEADERS_H_

@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package CommonMsg;
+
+message Header {
+    // Message publishing time in seconds.
+     double timestamp_sec = 1;
+
+     string frame_id = 2;
+
+}

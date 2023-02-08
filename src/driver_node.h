@@ -26,6 +26,14 @@
 #define LIVOX_DRIVER_NODE_H
 
 #include "include/ros_headers.h"
+#include <iostream>
+#include <chrono>
+#include <vector>
+#include <csignal>
+#include <thread>
+#include <future>
+
+
 
 namespace livox_ros {
 
@@ -47,6 +55,25 @@ class DriverNode final : public ros::NodeHandle {
   std::unique_ptr<Lddc> lddc_ptr_;
   std::shared_ptr<std::thread> pointclouddata_poll_thread_;
   std::shared_ptr<std::thread> imudata_poll_thread_;
+  std::shared_future<void> future_;
+  std::promise<void> exit_signal_;
+};
+
+#elif defined BUILDING_ECAL
+class DriverNode {
+ public:
+  DriverNode() = default;
+  DriverNode(const DriverNode &) = delete;
+  ~DriverNode();
+  DriverNode &operator=(const DriverNode &) = delete;
+
+  DriverNode& GetNode() noexcept;
+
+  void PointCloudDataPollThread();
+
+  std::unique_ptr<Lddc> lddc_ptr_;
+  std::shared_ptr<std::thread> pointclouddata_poll_thread_;
+  // std::shared_ptr<std::thread> imudata_poll_thread_;
   std::shared_future<void> future_;
   std::promise<void> exit_signal_;
 };
