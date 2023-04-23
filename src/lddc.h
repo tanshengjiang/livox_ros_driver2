@@ -43,7 +43,8 @@ typedef enum {
 typedef enum {
   kPointCloud2Msg = 0,
   kLivoxCustomMsg = 1,
-  KPointEcal2Msg = 2,
+  KPointEcal2MsgXYZI = 2,
+  KPointEcal2MsgXYZIT = 3,
   kPclPxyziMsg = 3,
   kLivoxImuMsg = 4,
 } TransferType;
@@ -66,9 +67,12 @@ using CustomMsg = livox_ros_driver2::msg::CustomMsg;
 using CustomPoint = livox_ros_driver2::msg::CustomPoint;
 using ImuMsg = sensor_msgs::msg::Imu;
 #elif defined BUILDING_ECAL
-using Publisher = eCAL::protobuf::CPublisher<SensorMsg::PointCloudXYZIT>;
-using PublisherPtr = std::shared_ptr<eCAL::protobuf::CPublisher<SensorMsg::PointCloudXYZIT>>;
-using PointCloudEcal = SensorMsg::PointCloudXYZIT;
+using PublisherXYZI = eCAL::protobuf::CPublisher<SensorMsg::PointCloudXYZI>;
+using PublisherXYZIPtr = std::shared_ptr<eCAL::protobuf::CPublisher<SensorMsg::PointCloudXYZI>>;
+using PublisherXYZIT = eCAL::protobuf::CPublisher<SensorMsg::PointCloudXYZIT>;
+using PublisherXYZITPtr = std::shared_ptr<eCAL::protobuf::CPublisher<SensorMsg::PointCloudXYZIT>>;
+using PointCloudEcalXYZI = SensorMsg::PointCloudXYZI;
+using PointCloudEcalXYZIT = SensorMsg::PointCloudXYZIT;
 #endif
 
 #if (BUILDING_ROS2 || BUILDING_ROS1)
@@ -117,7 +121,8 @@ class Lddc final {
 #endif
 
 #ifdef BUILDING_ECAL
-  void PublishPointcloudEcal(LidarDataQueue *queue, uint8_t index);
+  void PublishPointcloudEcalXyzi(LidarDataQueue *queue, uint8_t index);
+  void PublishPointcloudEcalXyzit(LidarDataQueue *queue, uint8_t index);
 #endif
 
 #if(BUILDING_ROS2 || BUILDING_ROS1)
@@ -131,8 +136,10 @@ class Lddc final {
 #endif
 
 #ifdef BUILDING_ECAL
-  void InitPointcloudEcal2Msg(const StoragePacket& pkg, PointCloudEcal& cloud, uint64_t& timestamp);
-  void PublishPointcloudEcal2Data(const uint8_t index, uint64_t timestamp, const PointCloudEcal& cloud);
+  void InitPointcloudEcal2MsgXyzi(const StoragePacket& pkg, PointCloudEcalXYZI& cloud, double& timestamp);
+  void PublishPointcloudEcal2DataXyzi(const uint8_t index, double timestamp, const PointCloudEcalXYZI& cloud);
+  void InitPointcloudEcal2MsgXyzit(const StoragePacket& pkg, PointCloudEcalXYZIT& cloud, double& timestamp);
+  void PublishPointcloudEcal2DataXyzit(const uint8_t index, double timestamp, const PointCloudEcalXYZIT& cloud);
 #endif
   
 #if(BUILDING_ROS2 || BUILDING_ROS1)
@@ -159,7 +166,8 @@ class Lddc final {
   PublisherPtr GetCurrentImuPublisher(uint8_t index);
 #endif
 #ifdef BUILDING_ECAL
-  PublisherPtr GetCurrentPublisher(uint8_t index);
+  PublisherXYZIPtr GetCurrentXyziPublisher(uint8_t index);
+  PublisherXYZITPtr GetCurrentXyzitPublisher(uint8_t index);
 #endif
 
  private:
@@ -185,8 +193,10 @@ class Lddc final {
   PublisherPtr private_imu_pub_[kMaxSourceLidar];
   PublisherPtr global_imu_pub_;
 #elif defined BUILDING_ECAL
-  PublisherPtr private_pub_[kMaxSourceLidar];
-  PublisherPtr global_pub_;
+  PublisherXYZIPtr private_xyzi_pub_[kMaxSourceLidar];
+  PublisherXYZIPtr global_zyzi_pub_;
+  PublisherXYZITPtr private_xyzit_pub_[kMaxSourceLidar];
+  PublisherXYZITPtr global_zyzit_pub_;
 #endif
 
   livox_ros::DriverNode *cur_node_;

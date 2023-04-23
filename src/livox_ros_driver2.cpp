@@ -117,11 +117,11 @@ int main(int argc, char **argv) {
   livox_ros::DriverNode livox_node;
 
   /** Init default system parameter */
-  int xfer_format = KPointEcal2Msg;
+  int xfer_format = KPointEcal2MsgXYZI;
   int multi_topic = 0;
   int data_src = kSourceRawLidar;
   double publish_freq  = 10.0; /* Hz */
-  int output_type      = kOutputToEcal;
+  int output_type = kOutputToEcal;
   std::string frame_id = "livox_frame";
 
   livox_node.future_ = livox_node.exit_signal_.get_future();
@@ -225,7 +225,6 @@ RCLCPP_COMPONENTS_REGISTER_NODE(livox_ros::DriverNode)
 
 #endif  // defined BUILDING_ROS2
 
-
 void DriverNode::PointCloudDataPollThread()
 {
   std::future_status status;
@@ -235,6 +234,7 @@ void DriverNode::PointCloudDataPollThread()
     status = future_.wait_for(std::chrono::seconds(0));
   } while (status == std::future_status::timeout);
 }
+
 #if(BUILDING_ROS2 || BUILDING_ROS1)
 void DriverNode::ImuDataPollThread()
 {

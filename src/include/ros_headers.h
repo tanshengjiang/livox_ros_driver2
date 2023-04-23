@@ -33,7 +33,8 @@
 #include <ecal/ecal.h>
 #include <ecal/msg/protobuf/publisher.h>
 #include "ecal_headers.h"
-#include "../msg/proto_msg/point_cloud.pb.h"
+// #include "../msg/proto_msg/point_cloud.pb.h"
+#include "protobuf_sensor_msgs/sensor/pointcloud.pb.h"
 #endif
 
 #endif // ROS_HEADERS_H_

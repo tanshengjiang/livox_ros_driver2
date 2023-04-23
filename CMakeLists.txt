@@ -368,6 +368,9 @@ elseif(ECAL_EDITION STREQUAL "ECAL")
   )
 
   find_package(eCAL REQUIRED)
+  find_package(protobuf_sensor_msgs REQUIRED)
+  include_directories(${PROTO_SENSOR_MSGS_INCLUDE_DIR})
+
 
   # # Find pcl lib
   find_package(PCL REQUIRED)
@@ -382,30 +385,30 @@ elseif(ECAL_EDITION STREQUAL "ECAL")
 
   # Protobuf#
   find_package(Protobuf QUIET)
-  find_program(PROTOC protoc)
 
-  if(NOT PROTOC MATCHES "NOTFOUND" AND Protobuf_FOUND)
-    message(=============================================================)
-    message("-- Protobuf Found, Protobuf Support is turned On!")
-    message(=============================================================)
-    add_definitions(-DPROTO_FOUND)
+  # find_program(PROTOC protoc)
+  # if(NOT PROTOC MATCHES "NOTFOUND" AND Protobuf_FOUND)
+  #   message(=============================================================)
+  #   message("-- Protobuf Found, Protobuf Support is turned On!")
+  #   message(=============================================================)
+  #   add_definitions(-DPROTO_FOUND)
 
-    include_directories(${PROTOBUF_INCLUDE_DIRS})
-    SET(PROTO_FILE_PATH ${PROJECT_SOURCE_DIR}/msg/proto_msg)
-    file(GLOB PROTOBUF_FILELIST ${PROTO_FILE_PATH}/*.proto)
+  #   include_directories(${PROTOBUF_INCLUDE_DIRS})
+  #   SET(PROTO_FILE_PATH ${PROJECT_SOURCE_DIR}/msg/proto_msg)
+  #   file(GLOB PROTOBUF_FILELIST ${PROTO_FILE_PATH}/*.proto)
 
-    foreach(proto_file ${PROTOBUF_FILELIST})
-      message(STATUS "COMPILING ${proto_file} USING ${PROTOBUF_PROTOC_EXECUTABLE}")
-      execute_process(COMMAND ${PROTOBUF_PROTOC_EXECUTABLE}
-        --proto_path=${PROTO_FILE_PATH}
-        --cpp_out=${PROTO_FILE_PATH}
-        ${proto_file})
-    endforeach()
-  else(NOT PROTOC MATCHES "NOTFOUND" AND Protobuf_FOUND)
-    message(=============================================================)
-    message("-- Protobuf Not Found, Protobuf Support is turned Off!")
-    message(=============================================================)
-  endif(NOT PROTOC MATCHES "NOTFOUND" AND Protobuf_FOUND)
+  #   foreach(proto_file ${PROTOBUF_FILELIST})
+  #     message(STATUS "COMPILING ${proto_file} USING ${PROTOBUF_PROTOC_EXECUTABLE}")
+  #     execute_process(COMMAND ${PROTOBUF_PROTOC_EXECUTABLE}
+  #       --proto_path=${PROTO_FILE_PATH}
+  #       --cpp_out=${PROTO_FILE_PATH}
+  #       ${proto_file})
+  #   endforeach()
+  # else(NOT PROTOC MATCHES "NOTFOUND" AND Protobuf_FOUND)
+  #   message(=============================================================)
+  #   message("-- Protobuf Not Found, Protobuf Support is turned Off!")
+  #   message(=============================================================)
+  # endif(NOT PROTOC MATCHES "NOTFOUND" AND Protobuf_FOUND)
 
   # ---------------------------------------------------------------------------------------
   # Compiler config
@@ -465,8 +468,8 @@ elseif(ECAL_EDITION STREQUAL "ECAL")
     src/call_back/lidar_common_callback.cpp
     src/call_back/livox_lidar_callback.cpp
 
-    ${PROTO_FILE_PATH}/header.pb.cc
-    ${PROTO_FILE_PATH}/point_cloud.pb.cc
+    # ${PROTO_FILE_PATH}/header.pb.cc
+    # ${PROTO_FILE_PATH}/point_cloud.pb.cc
   )
 
   # ---------------------------------------------------------------------------------------
@@ -490,6 +493,7 @@ elseif(ECAL_EDITION STREQUAL "ECAL")
     ${APR_LIBRARIES}
     ${PROTOBUF_LIBRARY}
     eCAL::core
+    protobuf_sensor_msgs::protobuf_sensor_msgs
   )
 
   # ---------------------------------------------------------------------------------------
